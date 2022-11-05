@@ -1,0 +1,54 @@
+﻿@page "/fileupload"
+
+<InputFile OnChange="LoadFiles" multiple />
+
+<span>%@uploadedPercentage</span>
+
+@code {
+
+    [Inject]
+    private IWebHostEnvironment env { get; set; }
+
+    private List<IBrowserFile> uploadedFiles = new();
+    private long maxFileSize = 1024 * 1024 * 500;
+    private int maxFileCount = 3;
+    private bool isLoading = false;
+    private decimal uploadedPercentage = 0.0m;
+
+    private async Task LoadFiles(InputFileChangeEventArgs e)
+    {
+        isLoading = true;
+        uploadedFiles.Clear();
+        uploadedPercentage = 0.0m;
+
+        foreach (IBrowserFile file in e.GetMultipleFiles(maxFileCount))
+        {
+            try
+            {
+                var fileName = file.Name;
+                var path = Path.Combine("C:\\unsafe_uploads", fileName);
+
+                await using FileStream writeStream = new(path, FileMode.Create);
+                using var readStream = file.OpenReadStream(maxFileSize);
+                var bytesRead = 0;
+                var totalRead = 0;
+                var buffer = new byte[1024 * 10];
+
+                while ((bytesRead = await readStream.ReadAsync(buffer)) != 0)
+                {
+                    totalRead += bytesRead;
+                    await writeStream.WriteAsync(buffer, 0, bytesRead);
+                    uploadedPercentage = Decimal.Divide(totalRead, file.Size) * 100;
+                    StateHasChanged();
+                }
+
+               uploadedFiles.Add(file);
+            }
+            catch (Exception ex)
+            {
+
+            }
+        }
+        isLoading = false;
+    }
+}
